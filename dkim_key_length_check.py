@@ -3,6 +3,8 @@
 """
 dkim_key_length_check.py: Pull DKIM records from DNS and validate the RSA key length.
 
+Can either accept the Domain and Selector records directly, or it can pull them from an Outlook .msg file.
+
 Requirements:
 pyOpenSSL
 olefile
