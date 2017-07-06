@@ -16,7 +16,7 @@ dnspython
 """
 __author__ = "b4dpxl"
 __license__ = "GPL"
-__version__ = "0.2"
+__version__ = "0.3"
 
 import sys
 import argparse
@@ -120,7 +120,8 @@ def __lookup( host, port, nossl=False, out=None ):
             if proto is None:
                 # not worked out the protocol from the cert, or not checked the cert. Try and guess from the port
                 proto = "http"
-                if port == 443 or port == 8443:
+                ssl_ports = [ 443, 8443 ]
+                if port in ssl_ports:
                     proto = "https"
             out.write( "%s://%s:%d\n" % ( proto, PTR[:-1], port ) )
         printer().ok("Reverse DNS: %s" % PTR[:-1] )
