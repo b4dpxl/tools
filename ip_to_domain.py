@@ -16,7 +16,7 @@ dnspython
 """
 __author__ = "b4dpxl"
 __license__ = "GPL"
-__version__ = "0.1"
+__version__ = "0.2"
 
 import sys
 import argparse
@@ -107,12 +107,11 @@ def __lookup( host, port, nossl=False, out=None ):
         CN = __get_ssl_subject( host, port )
         if CN != None:
             printer().ok("Certificate Subject: %s" % CN)
-            if out is not None:
-                # managed to get something from the certificate, must be HTTPS :)
-                proto = "https"
+            # managed to get something from the certificate, must be HTTPS :)
+            proto = "https"
             if CN.startswith( "*." ):
                 printer().warn( "Wildcard certificate in use" )
-            else:
+            elif out is not None:
                 out.write( "%s://%s:%d\n" % ( proto, CN, port ) )
 
     PTR = __get_reverse_dns( host )
