@@ -13,10 +13,14 @@ For the first two options, certificate checking can be prevented by passing the 
 Requirements:
 pyOpenSSL
 dnspython
+
+History:
+0.4 - added support for different SSL/TLS versions
+
 """
 __author__ = "b4dpxl"
 __license__ = "GPL"
-__version__ = "0.3"
+__version__ = "0.4"
 
 import sys
 import argparse
@@ -61,30 +65,47 @@ class printer:
     def default(self, str):
         print(str)
 
-def __get_ssl_subject( ip, port ):
-    client = socket.socket()
+def __get_cert( client, ip, ssl_method ):
+    printer().debug( "Attempting connection with SSL/TLS method %d" % ssl_method )
+    client_ssl = SSL.Connection( SSL.Context( ssl_method ), client )
     try:
-        client.connect( ( ip, port ) )
+        client_ssl.set_connect_state()
+        client_ssl.set_tlsext_host_name( ip.encode() )
+        client_ssl.do_handshake()
+        return ( client_ssl.get_peer_certificate(), 0, None )
+    except SSL.Error as e:
+        # ssl/tls version error
+        return ( None, -2, e )
+    except Exception as e:
+        #printer().error("Unable to establish secure connection to %s:%d" % (ip, port))
+        return ( None, -1, e )
+    finally:
+        client_ssl.close()
 
-        printer().debug( "Connected to %s" % str( client.getpeername() ) )
 
-        client_ssl = SSL.Connection(SSL.Context(SSL.TLSv1_METHOD), client)
-        try:
-            client_ssl.set_connect_state()
-            client_ssl.set_tlsext_host_name( ip.encode() )
-            client_ssl.do_handshake()
-            cert = client_ssl.get_peer_certificate()
+def __get_ssl_subject( ip, port ):
+    try:
+        methods = [ SSL.TLSv1_2_METHOD, SSL.TLSv1_1_METHOD, SSL.TLSv1_METHOD, SSL.SSLv3_METHOD ]
+        cert = None
+        for method in methods:
+            client = socket.socket()
+            client.connect((ip, port))
+            printer().debug("Connected to %s" % str(client.getpeername()))
+
+            ( cert, errno, err ) = __get_cert( client, ip, method )
+            if errno == 0:
+                break
+            client.close()
+
+        if cert is not None:
             return cert.get_subject().CN
-        except Exception as e:
-            #print( e )
-            printer().error( "Unable to establish secure connection to %s:%d" % ( ip, port ) )
-            return None
-        finally:
-            client_ssl.close()
+        elif errno == -2:
+            printer().error("Unable to establish secure SSL or TLS connection to %s:%d" % (ip, port) )
+        else:
+            printer().error("Unable to establish secure connection to %s:%d; Error msg: %s" % (ip, port, err))
 
     except Exception as e:
-        #print( e )
-        printer().error("Unable to connect to %s:%d" % ( ip, port ) )
+        printer().error("Unable to connect to %s:%d; Error msg: %s" % ( ip, port, e ) )
         return None
 
     finally:
