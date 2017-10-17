@@ -78,12 +78,15 @@ def get_key_length( _key ):
 
 def main():
 
-    parser = argparse.ArgumentParser( description='DKIM Key Length Checker' )
+    parser = argparse.ArgumentParser( description="""DKIM Key Length Checker
+
+Checks for a valid DKIM record, then validates the length of the RSA key.
+Either a Domain and Selector, or a File (Outlook .msg file) must be provided.
+""", formatter_class=argparse.RawTextHelpFormatter )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument( '--domain', '-d', help='Enter the Domain name to verify. E.g. pxl.me.uk' )
+    group.add_argument( '--domain', '-d', help='Enter the Domain name to verify. E.g. example.com' )
     parser.add_argument('--selector', '-s', help='Enter the Selector to verify [default]', required=False, default="default" )
     group.add_argument( '--file', '-f', help='Outlook message file (.msg) to analyse' )
-    #parser.add_argument('--domain', '-d', help='Enter the Domain name to verify. E.g. pxl.me.uk', required=True )
     args = parser.parse_args()
 
     if args.file:

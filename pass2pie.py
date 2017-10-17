@@ -90,13 +90,6 @@ provides a format intended for use in Excel to create pie charts or similar.
                         if pwd in themes[theme]:
                             pwd = "[%s]" % theme
 
-#                    if pwd in themes_months:
-#                        pwd = "[month]"
-#                    elif pwd in themes_days:
-#                        pwd = "[day]"
-#                    elif pwd in themes_season:
-#                        pwd = "[season]"
-
                 if pwd in passes:
                     passes[pwd] = passes[pwd] + 1
                 else:
@@ -131,6 +124,5 @@ provides a format intended for use in Excel to create pie charts or similar.
                 print("[Other],%d,%s%%,[Other] (%s%%)" % ( remainder, remain_pct, remain_pct ))
             else:
                 print( "[Other] : %d : %s%%" % ( remainder, remain_pct ))
-
 
 main()

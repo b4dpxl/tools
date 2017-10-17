@@ -214,7 +214,10 @@ def process_xml( file, nossl=False, out=None ):
 
 def main():
 
-    parser = argparse.ArgumentParser( description="Utility to obtain hostnames from IP's, using DNS records and TLS certificates" )
+    parser = argparse.ArgumentParser( description="""Utility to obtain hostnames from IP's, using DNS records and TLS certificates
+    
+One of IP address (host), a file containing a list of records in the format ip:port, or an NMAP XML file must be provided.
+""", formatter_class=argparse.RawTextHelpFormatter )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument( "-i", "--ip", dest="host", help="IP Address" )
     group.add_argument( "-f", "--file", help="File to parse, IP:PORT per line" )
