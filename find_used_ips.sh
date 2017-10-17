@@ -15,8 +15,16 @@ if ! echo $1 | grep -P "(\d{1,3}\.){3}\d{1,3}" > /dev/null ; then
 	exit 1
 fi
 
-f=`tempfile`
+bin=tempfile
+if ! which $bin > /dev/null 2>&1 ; then
+	# Fedora doesn't have tempfile
+        bin=mktemp
+fi
+
+f=`$bin`
+touch $f
 > $f
+
 for src in 127.0.0.1 0.0.0.0 255.255.255.255 1.0.0.1 ; do
 	echo "Scanning with $src"
 	arp-scan -I eth0 --arpspa $src $1 >> $f
