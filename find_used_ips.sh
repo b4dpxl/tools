@@ -4,6 +4,9 @@
 # Run all the arp-scan options to try and find IP's in use for a given range
 # Note, you still need an idea of the IP range. Use tcpdump:
 #  tcpdump -li eth0 arp | grep -Po "(?<=tell )(\d{1,3}\.){3}\d{1,3}"
+#
+# All credit goes to Encription and http://pentestmonkey.net/blog/the-science-of-safely-finding-an-unused-ip-address
+# for showing me how to do this. I just scripted it.
 
 # check it's probably an IP (basic regex)
 if ! echo $1 | grep -P "(\d{1,3}\.){3}\d{1,3}" > /dev/null ; then
