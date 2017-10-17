@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Author: Chris Hembrow
+# Author: b4dpxl
 # Run all the arp-scan options to try and find IP's in use for a given range
 # Note, you still need an idea of the IP range. Use tcpdump:
 #  tcpdump -li eth0 arp | grep -Po "(?<=tell )(\d{1,3}\.){3}\d{1,3}"
