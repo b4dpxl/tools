@@ -1,7 +1,7 @@
 #! /bin/env python
 
 """
-pyDNSExfiltrateD.py: Act as a DNS listener, and record the lookups to a log file with timestamp & source IP.
+pyDNSExfiltrateD.py: Act as a DNS listener, and record the lookups to a log file with timestamp & source nameserver IP.
 
 Usage:
 pyDNSExfiltrateD.py start|stop|restart
@@ -19,7 +19,6 @@ History:
 """
 
 import datetime
-import sys
 import time
 import threading
 import traceback
@@ -30,6 +29,9 @@ from daemon import runner
 BASE = ".dns.my.domain.com." # change this to match your registered NS. Must end in .
 PID = "/var/run/pyDNS.pid"
 LOG = "/var/log/dnsexfil_results.log"
+# these next 2 need to be changed to /dev/null if this is running as a service
+STDOUT = "/dev/stdout"
+STDERR = "/dev/stderr"
 
 
 class UDPRequestHandler( SocketServer.BaseRequestHandler ):
@@ -54,8 +56,8 @@ class App():
 
   def __init__(self):
     self.stdin_path = '/dev/null'
-    self.stdout_path = '/dev/stdout'
-    self.stderr_path = '/dev/stderr'
+    self.stdout_path = STDOUT
+    self.stderr_path = STDERR
     self.pidfile_path =  PID
     self.pidfile_timeout = 5
 
@@ -75,8 +77,6 @@ class App():
     try:
       while 1:
         time.sleep(1)
-        sys.stderr.flush()
-        sys.stdout.flush()
 
     except KeyboardInterrupt:
       pass
