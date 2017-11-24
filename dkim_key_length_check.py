@@ -40,7 +40,7 @@ def extract_headers( file ):
         sys.exit(-3)
     if "DKIM-Signature" in header:
         print( "Got header" )
-        s = re.search( """\\bs=(\\w+);""", header ).group(1)
+        s = re.search( """\\bs=([\\w\\-]+);""", header ).group(1)
         d = re.search( """\\bd=(([\\w+\\-]+\\.)+[\\w+\\-]+\\w+);""", header ).group(1)
         return (s, d)
     else:
