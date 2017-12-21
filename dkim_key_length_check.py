@@ -11,11 +11,12 @@ olefile
 
 History:
 1.1.1 - externalised the printer module
+1.1.2 - fixed issue with not showing the domain name properly in the results
 """
 __author__ = "b4dpxl"
 __credits__ = [ "https://protodave.com/" ]
 __license__ = "GPL"
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 
 
 import dns.resolver
@@ -93,7 +94,7 @@ Either a Domain and Selector, or a File (Outlook .msg file) must be provided.
                 rsa = re.search( """p=([\w\/\+]+)\\b""", str_txt ).group(1)
                 printer().info( "RSA key: %s" % rsa )
                 key_len = get_key_length( rsa )
-                printer().ok( "Key length for %s is %d bits" % ( args.domain, key_len ) )
+                printer().ok( "Key length for %s is %d bits" % ( domain, key_len ) )
             else:
                 printer().warn( "No valid TXT entries for %s" % domain_key )
     except:
