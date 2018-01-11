@@ -11,11 +11,12 @@ pip3 install pyOpenSSL olefile dnspython
 History:
 0.1
 0.2 - made into a Class
+0.3 - added support for specifying name server to use
 """
 __author__ = "b4dpxl"
 __credits__ = ["https://protodave.com/", "https://github.com/ins1gn1a/"]
 __license__ = "GPL"
-__version__ = "0.2"
+__version__ = "0.3"
 
 import argparse
 import dns.resolver
@@ -110,16 +111,20 @@ class EmailAnalyser:
     domain = None
     dkim_domain = None
     selector = None
+    name_server = None
 
     printer = None
 
-    def __init__(self, file=None, domain=None, selector=None, quiet=False, wrap=0):
+    def __init__(self, file=None, domain=None, selector=None, quiet=False, wrap=0, ns=None):
         self.printer = Printer(debug=not quiet, wrap=wrap)
         if file is not None:
             self.selector, self.dkim_domain, self.domain = self.__extract_mail_headers(file)
         else:
             self.dkim_domain = self.domain = domain
             self.selector = selector
+        self.name_server = ns
+        if self.name_server is not None:
+            self.printer.info("Using Name Server %s" % self.name_server)
 
     def __add_commentary(self, commentary):
         self.commentaries.append(commentary)
@@ -174,7 +179,10 @@ class EmailAnalyser:
     def __get_txt_records(self, domain):
         txt_list = []
         try:
-            for txt in dns.resolver.query(domain, 'TXT').response.answer:
+            resolver = dns.resolver.Resolver()
+            if self.name_server is not None:
+                resolver.nameservers = [ self.name_server ]
+            for txt in resolver.query(domain, 'TXT').response.answer:
                 txt_list.append(txt)
         except:
             pass
@@ -405,28 +413,29 @@ def main():
 
 Checks for and validates SPF and DMARC DNS records. 
 Checks for a valid DKIM record, then validates the length of the RSA key.
-Either a Domain and Selector, or a File (Outlook .msg file) must be provided.
+Either a Domain and optional Selector, or a File (Outlook .msg file) must be provided.
 """, formatter_class=argparse.RawTextHelpFormatter)
 
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--domain', '-d', help='Enter the Domain name to verify. E.g. example.com')
-    parser.add_argument('--selector', '-s', help='Enter the Selector to verify [default]', required=False, default="default")
-    group.add_argument('--file', '-f', help='Outlook message file (.msg) to analyse')
+    group.add_argument('--domain', '-d', help="Enter the Domain name to verify. E.g. example.com")
+    parser.add_argument('--selector', '-s', help="Enter the Selector to verify [default='default']", required=False, default="default")
+    group.add_argument('--file', '-f', help="Outlook message file (.msg) to analyse")
     parser.add_argument('--output', '-o', help="SureFormat output file. Use '-' for stdout", required=False)
     parser.add_argument('--no-dkim', dest="no_dkim", help="Skip DKIM checks", required=False, action="store_true")
     parser.add_argument('--quiet', '-q', help="Exclude info messages", required=False, action="store_true")
     parser.add_argument('--wrap', '-w', help="Wrap output at ~80 characters", required=False, action="store_true")
+    parser.add_argument('--ns', dest="name_server", help="Name server to use instead of network default", required=False, default=None)
     args = parser.parse_args()
 
     wrap_length = 0 if not args.wrap else 80
 
     if args.file:
         #selector, dkim_domain, domain = extract_mail_headers(args.file)
-        analyser = EmailAnalyser(file=args.file, quiet=args.quiet, wrap=wrap_length)
+        analyser = EmailAnalyser(file=args.file, quiet=args.quiet, wrap=wrap_length, ns=args.name_server)
     else:
         # selector = args.selector
         # dkim_domain = domain = args.domain
-        analyser = EmailAnalyser(domain=args.domain, selector=args.selector, quiet=args.quiet, wrap=wrap_length)
+        analyser = EmailAnalyser(domain=args.domain, selector=args.selector, quiet=args.quiet, wrap=wrap_length, ns=args.name_server)
 
     analyser.check_spf()
     analyser.check_dmarc()
