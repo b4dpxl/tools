@@ -12,11 +12,12 @@ History:
 0.1
 0.2 - made into a Class
 0.3 - added support for specifying name server to use
+0.3.1 - updated DMARC text
 """
 __author__ = "b4dpxl"
 __credits__ = ["https://protodave.com/", "https://github.com/ins1gn1a/"]
 __license__ = "GPL"
-__version__ = "0.3"
+__version__ = "0.3.1"
 
 import argparse
 import dns.resolver
@@ -317,15 +318,15 @@ class EmailAnalyser:
 # TODO Check for SPF/DMARC non-authorised rejection (No mail)
                 if param == "p":
                     if value == "quarantine":
-                        self.printer.info("p=quarantine: Suspicious emails will be marked as suspected SPAM.")
-                        self.__add_commentary("- suspicious emails would be marked as SPAM.")
+                        self.printer.info("p=quarantine: Suspicious emails should be marked as suspected SPAM.")
+                        self.__add_commentary("- suspicious emails should be marked as SPAM.")
                     elif value == "reject":
-                        self.printer.ok("p=reject: Emails that fail DKIM or SPF checks will be rejected.")
-                        self.__add_commentary("- emails failing DKIM or SPF checked would be rejected.")
+                        self.printer.ok("p=reject: Emails that fail DKIM or SPF checks should be rejected.")
+                        self.__add_commentary("- emails failing DKIM or SPF checked should be rejected.")
                     elif value == "none":
-                        self.printer.warn("p=none: No actions will be performed against emails that have failed DMARC checks.")
-                        self.__add_commentary("- no actions will be performed against emails that have failed DMARC checks, and so these might not be detected.")
-                        dmarc_vulns.append("No actions will be performed against emails that have failed DMARC checks, and so these might not be detected.")
+                        self.printer.warn("p=none: No specific actions are recommended to be performed against emails that have failed DMARC checks.")
+                        self.__add_commentary("- no specific actions are recommended to be performed against emails that have failed DMARC checks, and so these emails may not be identified as invalid.")
+                        dmarc_vulns.append("No specific actions are recommended to be performed against emails that have failed DMARC checks, and so these emails may not be identified as invalid.")
                     else:
                         self.printer.error("%s=%s: Unknown option" % (param, value))
 
