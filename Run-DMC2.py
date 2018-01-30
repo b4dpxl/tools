@@ -13,11 +13,12 @@ History:
 0.2 - made into a Class
 0.3 - added support for specifying name server to use
 0.3.1 - updated DMARC text
+0.4 - externalised Printer and updated to use ".format" because 'reasons'
 """
 __author__ = "b4dpxl"
 __credits__ = ["https://protodave.com/", "https://github.com/ins1gn1a/"]
 __license__ = "GPL"
-__version__ = "0.3.1"
+__version__ = "0.4"
 
 import argparse
 import dns.resolver
@@ -27,84 +28,20 @@ import os
 import sys
 from OpenSSL import crypto
 from xml.etree import ElementTree as ET
-
-
-class Printer:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
-    __debug_on = True
-    __wrap_length = 0
-
-    def __init__(self, debug=True, wrap=0):
-        self.__debug_on = debug
-        self.__wrap_length = wrap
-
-    def ok(self, str):
-        self.print_col("[+]", self.__wrap(str), self.OKGREEN)
-
-    def info(self, str):
-        self.print_col("[*]", self.__wrap(str), self.OKBLUE)
-
-    def warn(self, str):
-        self.print_col("[~]", self.__wrap(str), self.WARNING)
-
-    def error(self, str):
-        self.print_col("[!]", self.__wrap(str), self.FAIL)
-
-    def debug(self, str):
-        if self.__debug_on:
-            self.__default("[-] %s" % self.__wrap(str))
-
-    def print_col(self, str1, str2, col):
-        print("%s%s%s %s" % (col, str1, self.ENDC, str2))
-
-    def __default(self, str):
-        print(str)
-
-    def __wrap(self, str):
-        if self.__wrap_length == 0:
-            return str
-        out = []
-        wl = self.__wrap_length - 4 # "4" because of the "[x] "
-        for line in str.split('\n'):
-            tmp = line.strip()
-            while len(tmp) > wl:
-                # Try for a space to split on first so we don't mess up IP addresses and domains
-                r = re.search(r"[\s]", tmp[wl - 1:])
-                if r is not None:
-                    i = r.start() + wl
-                    out.append(tmp[:i].strip())
-                    tmp = tmp[i:].strip()
-                else:
-                    if len(tmp) > wl + 15: # bit of a buffer to try and stop splitting the last word
-                        # just hard split :(
-                        out.append(tmp[:wl].strip())
-                        tmp = tmp[wl:].strip()
-                    else:
-                        break
-            out.append(tmp)
-        # 4 spaces to accommodate "[x] "
-        return "\n    ".join(out)
+from __printer import Printer
 
 
 class EmailAnalyser:
     src_vulnerabilities = {
-        "no-dmarc": { "id": "SC-2166", "text": "No DMARC records were present for the domain '%s'" },
-        "no-spf": { "id": "SC-2090", "text": "No SPF records were present for the domain '%s'" },
-        "no-dkim": { "id": "SC-2165", "text": "DKIM records were not present on the domain '%s', or no sample email was available to identify the DKIM Selector" },
+        "no-dmarc": {"id": "SC-2166", "text": "No DMARC records were present for the domain '{domain}'"},
+        "no-spf": {"id": "SC-2090", "text": "No SPF records were present for the domain '{domain}'"},
+        "no-dkim": {"id": "SC-2165", "text": "DKIM records were not present on the domain '{domain}', or no sample email was available to identify the DKIM Selector"},
 # TODO we need a vuln for Weak DMARC
-        "weak-dmarc": { "id": "", "text": "The domain '%s' was found to have the following issues with the DMARC records:\n- %s" },
-        "weak-spf": { "id": "SC-2183", "text": "The domain '%s' was not found to have a secure SPF record configured, and as such it would be possible to spoof emails from the organisation (e.g. user.name@%s). The SPF record was set as the following:\n%s" },
-        "weak-dkim": { "id": "SC-2187", "text": "The domain '%s' utilised a DKIM key, but the key length of %s was less than 2048-bits." },
-        "overall": { "id": "SC-2157", "text": "An assessment of the standard email spoofing and SPAM prevention records on the '%s' domain was performed.\n\n%s" }
-    }
+        "weak-dmarc": {"id": "", "text": "The domain '{domain}' was found to have the following issues with the DMARC records:\n- {issues}"},
+        "weak-spf": {"id": "SC-2183", "text": "The domain '{domain}' was not found to have a secure SPF record configured, and as such it would be possible to spoof emails from the organisation (e.g. user.name@%s). The SPF record was set as the following:\n{spf}"},
+        "weak-dkim": {"id": "SC-2187", "text": "The domain '{domain}' utilised a DKIM key, but the key length of {length} was less than 2048-bits."},
+        "overall": {"id": "SC-2157", "text": "An assessment of the standard email spoofing and SPAM prevention records on the '{domain}' domain was performed.\n\n{text}"}
+   }
 
     commentaries = []
     vulns = []
@@ -125,20 +62,22 @@ class EmailAnalyser:
             self.selector = selector
         self.name_server = ns
         if self.name_server is not None:
-            self.printer.info("Using Name Server %s" % self.name_server)
+            self.printer.info("Using Name Server {}".format(self.name_server))
 
     def __add_commentary(self, commentary):
         self.commentaries.append(commentary)
 
-    def __add_vuln(self, vuln, options):
-        self.vulns.append({ "id": vuln["id"], "text": vuln["text"] % options })
+    def __add_vuln(self, vuln, options={}):
+        x = options
+        x['domain'] = self.domain
+        self.vulns.append({"id": vuln["id"], "text": vuln["text"].format(**x)})
 
     def __extract_sender_domain_from_header(self, header):
         email_rex = r"(?<=@)(([\w\-]+\.)+[\w\-]+)"
         tags = [ "X-SENDER-ID:", "RETURN-PATH:", "FROM:" ]
         for tag in tags:
             if tag in header.upper():
-                line = re.search(r"%s.*" % tag, header, re.IGNORECASE).group(0)
+                line = re.search(r"{}.*".format(tag), header, re.IGNORECASE).group(0)
                 res = re.search(email_rex, line)
                 if res:
                     return(res.group(0))
@@ -148,13 +87,13 @@ class EmailAnalyser:
         selector = dkim_domain = None
 
         if not os.path.exists(file):
-            self.printer.error("File not found: %s" % file)
+            self.printer.error("File not found: '{}'".format(file))
             sys.exit(-2)
         try:
             ole = olefile.OleFileIO(file)
             header = str(ole.openstream('__substg1.0_007D001F').getvalue(), 'utf_16_le')
         except Exception as e:
-            self.printer.error("Unable to parse .msg file: %s" % e)
+            self.printer.error("Unable to parse .msg file: {}".format(e))
             sys.exit(-3)
         if "DKIM-SIGNATURE" in header.upper():
             self.printer.info("DKIM Signature found in email")
@@ -165,16 +104,16 @@ class EmailAnalyser:
 
         domain = self.__extract_sender_domain_from_header(header)
         if domain is not None:
-            self.printer.debug("Found domain: '%s'" % domain)
+            self.printer.debug("Found domain: '{}'".format(domain))
             if dkim_domain is None:
                 dkim_domain = domain
-            return(selector, dkim_domain, domain)
+            return selector, dkim_domain, domain
         else:
-            Printer.error("Unable to determine domain")
+            self.printer.error("Unable to determine domain")
             sys.exit(-4)
 
     def __get_key_length(self, key):
-        pub_key = crypto.load_publickey(crypto.FILETYPE_PEM, ("-----BEGIN PUBLIC KEY-----\n%s\n-----END PUBLIC KEY-----" % key).encode())
+        pub_key = crypto.load_publickey(crypto.FILETYPE_PEM, ("-----BEGIN PUBLIC KEY-----\n{}\n-----END PUBLIC KEY-----".format(key)).encode())
         return pub_key.bits()
 
     def __get_txt_records(self, domain):
@@ -193,8 +132,8 @@ class EmailAnalyser:
         got_dkim = False
 
         if self.selector is not None:
-            domain_key = "%s._domainkey.%s" % (self.selector, self.dkim_domain)
-            self.printer.debug("Checking DKIM entry for %s" % domain_key)
+            domain_key = "{}._domainkey.{}".format(self.selector, self.dkim_domain)
+            self.printer.debug("Checking DKIM entry for {}".format(domain_key))
             txt_list = self.__get_txt_records(domain_key)
 
             if len(txt_list) > 0:
@@ -208,23 +147,23 @@ class EmailAnalyser:
                         if "k=rsa" in str_txt and "p=" in str_txt:
                             got_dkim = True
                             rsa = re.search("p=([\w\/\+]+)\\b", str_txt).group(1)
-                            self.printer.debug("Found RSA key: %s" % rsa)
+                            self.printer.debug("Found RSA key:\n    {}".format(rsa))
                             key_len = self.__get_key_length(rsa)
                             if key_len < 2048:
-                                self.printer.warn("The DKIM RSA key length for %s is %d-bits" % (self.dkim_domain, key_len))
-                                self.__add_vuln(self.src_vulnerabilities["weak-dkim"], (self.dkim_domain, key_len))
-                                self.__add_commentary("\nThe domain '%s' utilised DKIM records, although the RSA key length was %s-bits, which is less than the current recomendation of 2048-bits." % (self.dkim_domain, key_len))
+                                self.printer.warn("The DKIM RSA key length for {} is {:d}-bits".format(self.dkim_domain, key_len))
+                                self.__add_vuln(self.src_vulnerabilities["weak-dkim"], {'length':key_len})
+                                self.__add_commentary("\nThe domain '{}' utilised DKIM records, although the RSA key length was {:d}-bits, which is less than the current recomendation of 2048-bits.".format(self.dkim_domain, key_len))
                             else:
-                                self.printer.ok("The DKIM RSA key length for '%s' is %d-bits" % (self.dkim_domain, key_len))
-                                self.__add_commentary("\nThe domain '%s' utilised DKIM records, with a key length of at least 2048-bits." % self.dkim_domain)
+                                self.printer.ok("The DKIM RSA key length for '{}' is {:d}-bits".format(self.dkim_domain, key_len))
+                                self.__add_commentary("\nThe domain '{}' utilised DKIM records, with a key length of at least 2048-bits.".format(self.dkim_domain))
 
                 except:
                     self.printer.error("Unable to parse TXT records")
 
         if not got_dkim:
-            self.printer.error("No valid DKIM records present for %s" % self.dkim_domain)
-            self.__add_vuln(self.src_vulnerabilities["no-dkim"], (self.dkim_domain))
-            self.__add_commentary("\nThe domain '%s' did not appear to utilise DKIM records, or there was no sample email available to review from which to determine the DKIM domain selector." % self.dkim_domain)
+            self.printer.error("No valid DKIM records present for {}".format(self.dkim_domain))
+            self.__add_vuln(self.src_vulnerabilities["no-dkim"])
+            self.__add_commentary("\nThe domain '{}' did not appear to utilise DKIM records, or there was no sample email available to review from which to determine the DKIM domain selector.".format(self.dkim_domain))
 
     def check_spf(self,):
         txt_list = self.__get_txt_records(self.domain)
@@ -245,15 +184,15 @@ class EmailAnalyser:
                 self.printer.error("Unable to parse TXT records (DMARC)")
 
         if not got_spf:
-            self.printer.error("No valid SPF records present for %s" % self.domain)
-            self.__add_vuln(self.src_vulnerabilities["no-spf"], (self.domain))
-            self.__add_commentary("No SPF records were identified for the domain '%s'." % self.domain)
+            self.printer.error("No valid SPF records present for {}".format(self.domain))
+            self.__add_vuln(self.src_vulnerabilities["no-spf"])
+            self.__add_commentary("No SPF records were identified for the domain '{}'.".format(self.domain))
 
     def __parse_spf(self, domain, record):
-        self.printer.debug("Checking SPF record: %s" % record)
+        self.printer.debug("Checking SPF record:\n    {}".format(record))
         allowed_servers = []
         try:
-            self.printer.info("An SPF record is present for '%s'" % self.domain)
+            self.printer.info("An SPF record is present for '{}'".format(self.domain))
             params = ["include", "ip4", "ip6", "a", "ptr"]
             for param, value in [(x.strip(), y.strip()) for x, y in [x.split(":") for x in record.strip().split(" ") if ":" in x]]:
                 if param in params:
@@ -266,18 +205,18 @@ class EmailAnalyser:
                 if param == "mx":
                     allowed_servers.append("Mail Exchange (MX) servers")
                 elif param == "-all":
-                    self.printer.ok("Only the following mail servers are authorised to send mail from the '%s' domain, with a hard fail for unauthorised servers:\n\t%s" % (domain, "\n\t".join(allowed_servers)))
-                    self.__add_commentary("The domain '%s' utilised strong SPF records, with a hard fail for unauthorised servers. This configuration permits only servers operated by or on behalf of the organisation to send email. The permitted servers were: \n- %s" % (domain, "\n- ".join(allowed_servers)))
+                    self.printer.ok("Only the following mail servers are authorised to send mail from the '{}' domain, with a hard fail for unauthorised servers:\n    {}".format(domain, "\n    ".join(allowed_servers)))
+                    self.__add_commentary("The domain '{}' utilised strong SPF records, with a hard fail for unauthorised servers. This configuration permits only servers operated by or on behalf of the organisation to send email. The permitted servers were: \n- {}".format(domain, "\n- ".join(allowed_servers)))
                     got_reject = True
                 elif param == "~all":
-                    self.printer.warn("The following mail servers are authorised to send mail from the '%s' domain, with a soft-fail for unauthorised servers: \n\t%s" % (domain, "\n\t".join(allowed_servers)))
-                    self.__add_commentary("The domain '%s' utilised SPF records, although with a soft fail (~all) for unauthorised servers. This configuration permits only servers operated by or on behalf of the organisation to send email. However a soft fail should only be used as a transition to a hard fail (-all). The permitted servers were:\n- %s" % (domain, "\n- ".join(allowed_servers)))
+                    self.printer.warn("The following mail servers are authorised to send mail from the '{}' domain, with a soft-fail for unauthorised servers: \n    {}".format(domain, "\n    ".join(allowed_servers)))
+                    self.__add_commentary("The domain '{}' utilised SPF records, although with a soft fail (~all) for unauthorised servers. This configuration permits only servers operated by or on behalf of the organisation to send email. However a soft fail should only be used as a transition to a hard fail (-all). The permitted servers were:\n- {}".format(domain, "\n- ".join(allowed_servers)))
                     got_reject = True
 
             if not got_reject:
-                self.printer.error("The %s domain is configured in a way that would allow domain email spoofing to be performed." % domain)
-                self.__add_commentary("The domain '%s' was not found to have a secure SPF record configured, and as such it would be possible to spoof emails from the organisation (e.g. user.name@%s). The SPF record was set as:\n- %s" % (domain, domain, record))
-                self.__add_vuln(self.src_vulnerabilities["weak-spf"], (domain, domain, record))
+                self.printer.error("The '{}' domain is configured in a way that would allow domain email spoofing to be performed.".format(domain))
+                self.__add_commentary("The domain '{0}' was not found to have a secure SPF record configured, and as such it would be possible to spoof emails from the organisation (e.g. user.name@{0}). The SPF record was set as:\n- {1}".format(domain, record))
+                self.__add_vuln(self.src_vulnerabilities["weak-spf"], {'spf':record})
 
             return True
 
@@ -285,7 +224,7 @@ class EmailAnalyser:
             return False
 
     def check_dmarc(self):
-        txt_list = self.__get_txt_records("_dmarc.%s" % self.domain)
+        txt_list = self.__get_txt_records("_dmarc.{}".format(self.domain))
         got_dmarc = False
         if len(txt_list) > 0:
             try:
@@ -296,23 +235,23 @@ class EmailAnalyser:
                         str_txt = re.sub(r"\"\s+\"", "", str_txt)
 
                     if "v=DMARC" in str_txt:
-                        # self.printer.comment("Found DMARC: %s" % str_txt)
+                        # self.printer.comment("Found DMARC: {}".formatstr_txt))
                         got_dmarc = self.__parse_dmarc(self.domain, re.search(r"v=DMARC[^\"]+", str_txt).group(0))
 
             except:
                 self.printer.error("Unable to parse TXT records (DMARC)")
 
         if not got_dmarc:
-            self.printer.error("No DMARC records are present for %s" % self.domain)
-            self.__add_vuln(self.src_vulnerabilities["no-dmarc"], (self.domain))
-            self.__add_commentary("\n\nThere were no DMARC records found within the Domain Name (DNS) TXT entries for '_dmarc.%s'. Implementing DMARC alongside SPF would provide granular control for the management and monitoring of email spoofing, and allow the organisation to proactively respond to possible abuse." % self.domain)
+            self.printer.error("No DMARC records are present for '{}'".format(self.domain))
+            self.__add_vuln(self.src_vulnerabilities["no-dmarc"])
+            self.__add_commentary("\n\nThere were no DMARC records found within the Domain Name (DNS) TXT entries for '_dmarc.{}'. Implementing DMARC alongside SPF would provide granular control for the management and monitoring of email spoofing, and allow the organisation to proactively respond to possible abuse.".format(self.domain))
 
     def __parse_dmarc(self, domain, record):
-        self.printer.debug("Checking DMARC record: %s" % record)
+        self.printer.debug("Checking DMARC record:\n    {}".format(record))
         dmarc_vulns = []
         try:
-            self.printer.info("A DMARC record is present for '%s'" % self.domain)
-            self.__add_commentary("\nThe DMARC configuration for '%s' was configured such that:" % domain)
+            self.printer.info("A DMARC record is present for '{}'".format(self.domain))
+            self.__add_commentary("\nThe DMARC configuration for '{}' was configured such that:".format(domain))
             report_addresses = []
             for param,value in [ (x.strip(), y.strip()) for x,y in [ x.split("=") for x in record.lower().split(";") if len(x) > 0 ] ]:
 # TODO Check for SPF/DMARC non-authorised rejection (No mail)
@@ -328,71 +267,70 @@ class EmailAnalyser:
                         self.__add_commentary("- no specific actions are recommended to be performed against emails that have failed DMARC checks, and so these emails may not be identified as invalid.")
                         dmarc_vulns.append("No specific actions are recommended to be performed against emails that have failed DMARC checks, and so these emails may not be identified as invalid.")
                     else:
-                        self.printer.error("%s=%s: Unknown option" % (param, value))
+                        self.printer.error("{}={}: Unknown option".format(param, value))
 
                 elif param == "adkim":
                     if value == "r":
-                        self.printer.info("adkim=r (Relaxed Mode): Emails from *.%s are permitted." % domain)
-                        self.__add_commentary("- all emails from subdomains of '%s' would be permitted." % domain)
+                        self.printer.info("adkim=r (Relaxed Mode): Emails from *.{} are permitted.".format(domain))
+                        self.__add_commentary("- all emails from subdomains of '{}' would be permitted.".format(domain))
                     elif value == "s":
-                        self.printer.ok("adkim=s (Strict Mode): Sender domains must match DKIM mail headers exactly. E.g. if 'd=%s' then emails are not permitted from subdomains." % domain)
-                        self.__add_commentary("- only emails from domains exactly matching '%s' would be permitted." % domain)
+                        self.printer.ok("adkim=s (Strict Mode): Sender domains must match DKIM mail headers exactly. E.g. if 'd={}' then emails are not permitted from subdomains.".format(domain))
+                        self.__add_commentary("- only emails from domains exactly matching '{}' would be permitted.".format(domain))
                     else:
-                        self.printer.error("%s=%s: Unknown option" % (param, value))
+                        self.printer.error("{}={}: Unknown option".format(param, value))
 
                 elif param == "pct":
-                    self.printer.info("pct=%s: %s%% of received mail is subject to DMARC processing." % (value, value))
-                    self.__add_commentary("- %s%% of emails received would be subject to DMARC processing." % value)
+                    self.printer.info("pct={0}: {0}% of received mail is subject to DMARC processing.".format(value))
+                    self.__add_commentary("- {}% of emails received would be subject to DMARC processing.".format(value))
 
                 elif param == "aspf":
                     if value == "r":
-                        self.printer.warn("aspf=r (Relaxed Mode): Any sub-domains from '%s' are permitted to match DMARC to SPF records." % domain)
-                        dmarc_vulns.append("Any sub-domains from '%s' are permitted to match DMARC to SPF records." % domain)
+                        self.printer.warn("aspf=r (Relaxed Mode): Any sub-domains from '{}' are permitted to match DMARC to SPF records.".format(domain))
+                        dmarc_vulns.append("Any sub-domains from '.format' are permitted to match DMARC to SPF records.".format(domain))
                     elif value == "s":
                         self.printer.info("aspf=s (Strict Mode): The 'header from' domain and SPF must match exactly to pass DMARC checks.")
                     else:
-                        self.printer.error("%s=%s: Unknown option." % (param, value))
+                        self.printer.error("{}={}: Unknown option.".format(param, value))
 
                 elif param == "rua":
                     for address in [ x.strip() for x in value.split(",") ]:
                         if address[0:7] != "mailto:":
-                            self.printer.error("rua=: Aggregate mail reports will not be sent as incorrect syntax is used. Prepend 'mailto:' before mail addresses. '%s'" % address)
-                            self.__add_commentary("- invalid email addresses (i.e. without the prepended 'mailto:') were included in the SPF configuration: '%s'" % address)
-                            dmarc_vulns.append("Invalid email addresses (i.e. without the prepended 'mailto:') were included in the SPF configuration: '%s'" % address)
+                            self.printer.error("rua=: Aggregate mail reports will not be sent as incorrect syntax is used. Prepend 'mailto:' before mail addresses. '{}'".format(address))
+                            self.__add_commentary("- invalid email addresses (i.e. without the prepended 'mailto:') were included in the SPF configuration: '{}'".format(address))
+                            dmarc_vulns.append("Invalid email addresses (i.e. without the prepended 'mailto:') were included in the SPF configuration: '{}'".format(address))
                         else:
                             report_addresses.append(address[8:].strip())
                     if len(report_addresses) > 0:
-                        self.printer.ok("rua=: Aggregate mail reports will be sent to the following email addresses:\n\t%s" % ("\n\t".join(report_addresses)))
+                        self.printer.ok("rua=: Aggregate mail reports will be sent to the following email addresses:\n    {}".format("\n    ".join(report_addresses)))
 
             if len(report_addresses) > 0:
-                self.__add_commentary("\nDMARC email aggregation reports for '%s' were configured to be sent to:\n- %s" % (domain, "\n- ".join(report_addresses)))
+                self.__add_commentary("\nDMARC email aggregation reports for '{}' were configured to be sent to:\n- {}".format(domain, "\n- ".join(report_addresses)))
 
 # TODO If we get a weak-dmarc vuln, we can enable this next bit
 #            if len(dmarc_vulns) > 0:
-#                self.__add_vuln(self.src_vulnerabilities["weak-dmarc"], (self.domain, "\n- ".join(dmarc_vulns)))
+#                self.__add_vuln(self.src_vulnerabilities["weak-dmarc"], {'domain':self.domain, 'issues:"\n- ".join(dmarc_vulns)})
 
             return True
         except:
             return False
 
-
     def generate_sureformat_xml(self, path):
         commentary = self.src_vulnerabilities["overall"]
-        commentary["text"] = commentary["text"] % (self.domain, ("\n".join(self.commentaries).strip()))
+        commentary["text"] = commentary["text"].format(domain = self.domain, text= ("\n".join(self.commentaries).strip()))
         xroot = ET.Element("items", {
             "source": "SureFormat",
             "version": "1.2"
-        })
+       })
         xitem = ET.SubElement(xroot, "item", {
             "hostname": self.domain,
             "ipaddress": ""
-        })
+       })
         xservices = ET.SubElement(xitem, "services")
         xservice = ET.SubElement(xservices, "service", {
             "name": "",
             "port": "",
             "protocol": "tcp"
-        })
+       })
         xvulnerabilities = ET.SubElement(xservice, "vulnerabilities")
         xvulnerability = ET.SubElement(xvulnerabilities, "vulnerability", {"id": commentary["id"]})
         xinformation = ET.SubElement(xvulnerability, "information")
@@ -426,6 +364,7 @@ Either a Domain and optional Selector, or a File (Outlook .msg file) must be pro
     parser.add_argument('--quiet', '-q', help="Exclude info messages", required=False, action="store_true")
     parser.add_argument('--wrap', '-w', help="Wrap output at ~80 characters", required=False, action="store_true")
     parser.add_argument('--ns', dest="name_server", help="Name server to use instead of network default", required=False, default=None)
+    parser.add_argument('--version', '-v', action='version', version='%(prog)s {}'.format(__version__))
     args = parser.parse_args()
 
     wrap_length = 0 if not args.wrap else 80
