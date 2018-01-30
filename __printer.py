@@ -1,6 +1,7 @@
 import re
 
-class printer:
+
+class Printer:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
@@ -31,10 +32,10 @@ class printer:
 
     def debug(self, str):
         if self.__debug_on:
-            self.__default("[-] %s" % str)
+            self.__default("[-] {}".format(str))
 
     def print_col(self, str1, str2, col):
-        print("%s%s%s %s" % (col, str1, self.ENDC, str2))
+        print("{}{}{} {}".format(col, str1, self.ENDC, str2))
 
     def __default(self, str):
         print(str)
