@@ -1,12 +1,13 @@
 #! /bin/sh
 
 # Author: b4dpxl
-# Version: 1.0
+# Version: 1.1
 
 usage() {
 	echo "Search data breaches for a given domain name"
 	echo "Assumes the file or folder name represents the breach name, and that files are gzipped"
 	echo "Searches folders then files in order"
+	echo "Also ignores any folders starting with _"
 	echo ""
         echo "Usage: $0 -o <output directory> -d <domain name> [-b <breaches directory>]" 1>&2
 	echo "Breaches directory defaults to '.'"
@@ -70,7 +71,7 @@ echo "${BLU}[*]${NC} Checking breaches in ${BREACH_DIR}"
 > "${OUT_DIR}/breaches.txt"
 cd ${BREACH_DIR}
 
-find . -maxdepth 1 -type d -print | while read dir ; do 
+find . -maxdepth 1 -type d -not -name "_*" -print | while read dir ; do 
 	dir=`echo "$dir" | cut -c 3-`
 	if [ ! -z "$dir" ] ; then
 		echo -n "[ ] Checking $dir..."
@@ -81,7 +82,7 @@ find . -maxdepth 1 -type d -print | while read dir ; do
 		rm -f "$out"
 	fi
 done
-for file in /*.gz ; do 
+for file in *.gz ; do 
 	f=`echo "$file" | awk -F'.' '{print $1}' | sed -e 's/_/ /g'`
 	echo -n "[ ] Checking $f...\t"
 	out=`mktemp`
