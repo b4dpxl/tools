@@ -1,5 +1,8 @@
 #! /bin/sh
 
+# Author: b4dpxl
+# Version: 1.0
+
 usage() {
 	echo "Search data breaches for a given domain name"
 	echo "Assumes the file or folder name represents the breach name, and that files are gzipped"
