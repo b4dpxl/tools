@@ -8,11 +8,15 @@ Can either accept the Domain and Selector records directly, or it can pull them 
 Requirements:
 pyOpenSSL
 olefile
+
+History:
+1.1.1 - externalised the printer module
+1.1.2 - fixed issue with not showing the domain name properly in the results
 """
 __author__ = "b4dpxl"
 __credits__ = [ "https://protodave.com/" ]
 __license__ = "GPL"
-__version__ = "1.1.0"
+__version__ = "1.1.2"
 
 
 import dns.resolver
@@ -22,35 +26,8 @@ from OpenSSL import crypto
 import olefile
 import os
 import sys
+from __printer import printer
 
-
-class printer:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
-    def ok(self, str):
-        self.print_col( "[+]", str, self.OKGREEN)
-
-    def info(self, str):
-        self.print_col( "[*]", str, self.OKBLUE)
-
-    def warn(self, str):
-        self.print_col( "[-]", str, self.WARNING)
-
-    def error(self, str):
-        self.print_col( "[!]", str, self.FAIL)
-
-    def print_col(self, str1, str2, col):
-        print("%s%s%s %s" % (col, str1, self.ENDC, str2))
-
-    def default(self, str):
-        print(str)
 
 def extract_headers( file ):
     if not os.path.exists( file ):
@@ -63,8 +40,8 @@ def extract_headers( file ):
         printer().error("Unable to parse .msg file")
         sys.exit(-3)
     if "DKIM-Signature" in header:
-        print( "Got header" )
-        s = re.search( """\\bs=(\\w+);""", header ).group(1)
+        printer().info( "Got header" )
+        s = re.search( """\\bs=([\\w\\-]+);""", header ).group(1)
         d = re.search( """\\bd=(([\\w+\\-]+\\.)+[\\w+\\-]+\\w+);""", header ).group(1)
         return (s, d)
     else:
@@ -117,7 +94,7 @@ Either a Domain and Selector, or a File (Outlook .msg file) must be provided.
                 rsa = re.search( """p=([\w\/\+]+)\\b""", str_txt ).group(1)
                 printer().info( "RSA key: %s" % rsa )
                 key_len = get_key_length( rsa )
-                printer().ok( "Key length for %s is %d bits" % ( args.domain, key_len ) )
+                printer().ok( "Key length for %s is %d bits" % ( domain, key_len ) )
             else:
                 printer().warn( "No valid TXT entries for %s" % domain_key )
     except:
