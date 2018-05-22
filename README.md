@@ -1,5 +1,5 @@
 # tools
-Miscellaneous tools with no better location
+Miscellaneous tools with no better location.
 
 ## Run-DMC2.py
 SPF, DMARC, and DKIM record checker. Replaces dkim_key_length_check.py
@@ -27,3 +27,6 @@ Search a directory of data breaches for a given domain name and extract unique e
 
 ## set_cf_ip.py
 Updates all A-records for specific CloudFlare DNS zones (domain names) to the current IP address. Useful for setting as a boot script on DigitalOcean droplets
+
+## requirements.txt
+Python PIP requirements.txt file. Covers all scripts (unless I've missed any), so may introduce unecessary packages if you only want a specific script. 

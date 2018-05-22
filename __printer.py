@@ -32,7 +32,7 @@ class Printer:
 
     def debug(self, str):
         if self.__debug_on:
-            self.__default("[-] {}".format(str))
+            self.__default("[-] {}".format(self.__wrap(str)))
 
     def print_col(self, str1, str2, col):
         print("{}{}{} {}".format(col, str1, self.ENDC, str2))
