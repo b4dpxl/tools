@@ -15,11 +15,12 @@ History:
 0.3.1 - updated DMARC text
 0.4 - externalised Printer and updated to use ".format" because 'reasons'
 0.5 - Added support for neutral all SPF records (?all)
+0.5.1 - Fixed issues with '?all'reporting. DKIM reports now distinguish between no DKIM and no sample email
 """
 __author__ = "b4dpxl"
 __credits__ = ["https://protodave.com/", "https://github.com/ins1gn1a/"]
 __license__ = "GPL"
-__version__ = "0.5"
+__version__ = "0.5.1"
 
 import argparse
 import dns.resolver
@@ -39,8 +40,9 @@ class EmailAnalyser:
     src_vulnerabilities = {
         "no-dmarc": {"id": "SC-2166", "text": "No DMARC records were present for the domain '{domain}'"},
         "no-spf": {"id": "SC-2090", "text": "No SPF records were present for the domain '{domain}'"},
-        "no-dkim": {"id": "SC-2165", "text": "DKIM records were not present on the domain '{domain}', or no sample email was available to identify the DKIM Selector"},
-# TODO we need a vuln for Weak DMARC
+        "no-dkim": {"id": "SC-2165", "text": "DKIM records were not present on the domain '{domain}'"},
+        "no-dkim-file": {"id": "SC-2165", "text": "DKIM records were not present on the domain '{domain}', or no sample email was available to identify the DKIM Selector"},
+        # TODO we need a vuln for Weak DMARC
         "weak-dmarc": {"id": "", "text": "The domain '{domain}' was found to have the following issues with the DMARC records:\n- {issues}"},
         "weak-spf": {"id": "SC-2183", "text": "The domain '{domain}' was not found to have a secure SPF record configured, and as such it would be possible to spoof emails from the organisation (e.g. user.name@{domain}). The SPF record was set as the following:\n{spf}"},
         "weak-dkim": {"id": "SC-2187", "text": "The domain '{domain}' utilised a DKIM key, but the key length of {length} was less than 2048-bits."},
@@ -54,6 +56,7 @@ class EmailAnalyser:
     dkim_domain = None
     selector = None
     name_server = None
+    has_file = False
 
     printer = None
 
@@ -61,6 +64,7 @@ class EmailAnalyser:
         self.printer = Printer(debug=not quiet, wrap=wrap)
         if file is not None:
             self.selector, self.dkim_domain, self.domain = self.__extract_mail_headers(file)
+            self.has_file = True
         else:
             self.dkim_domain = self.domain = domain
             self.selector = selector
@@ -166,8 +170,12 @@ class EmailAnalyser:
 
         if not got_dkim:
             self.printer.error("No valid DKIM records present for {}".format(self.dkim_domain))
-            self.__add_vuln(self.src_vulnerabilities["no-dkim"])
-            self.__add_commentary("\nThe domain '{}' did not appear to utilise DKIM records, or there was no sample email available to review from which to determine the DKIM domain selector.".format(self.dkim_domain))
+            if self.has_file:
+                self.__add_vuln(self.src_vulnerabilities["no-dkim"])
+                self.__add_commentary("\nThe domain '{}' did not appear to utilise DKIM records.".format(self.dkim_domain))
+            else:
+                self.__add_vuln(self.src_vulnerabilities["no-dkim-file"])
+                self.__add_commentary("\nThe domain '{}' did not appear to utilise DKIM records, or there was no sample email available to review from which to determine the DKIM domain selector.".format(self.dkim_domain))
 
     def check_spf(self,):
         txt_list = self.__get_txt_records(self.domain)
@@ -205,26 +213,32 @@ class EmailAnalyser:
                     allowed_servers.append("Mail Exchange (MX) servers")
 
             got_reject = False
-            got_neutral = False
             for param in [x for x in record.strip().split(" ") if ":" not in x ]:
                 if param == "mx":
                     allowed_servers.append("Mail Exchange (MX) servers")
                 elif param == "-all":
                     self.printer.ok("Only the following mail servers are authorised to send mail from the '{}' domain, with a hard fail for unauthorised servers:\n    {}".format(domain, "\n    ".join(allowed_servers)))
-                    self.__add_commentary("The domain '{}' utilised strong SPF records, with a hard fail for unauthorised servers. This configuration permits only servers operated by or on behalf of the organisation to send email. The permitted servers were: \n- {}".format(domain, "\n- ".join(allowed_servers)))
+                    self.__add_commentary("The domain '{}' utilised strong SPF records, with a hard fail for unauthorised servers. This configuration permits only servers operated by or on behalf of the organisation to "
+                                          "send email. The permitted servers were: \n- {}".format(domain, "\n- ".join(allowed_servers)))
                     got_reject = True
                 elif param == "~all":
                     self.printer.warn("The following mail servers are authorised to send mail from the '{}' domain, with a soft-fail for unauthorised servers: \n    {}".format(domain, "\n    ".join(allowed_servers)))
-                    self.__add_commentary("The domain '{}' utilised SPF records, although with a soft fail (~all) for unauthorised servers. This configuration permits only servers operated by or on behalf of the organisation to send email. However a soft fail should only be used as a transition to a hard fail (-all). The permitted servers were:\n- {}".format(domain, "\n- ".join(allowed_servers)))
+                    self.__add_commentary("The domain '{}' utilised SPF records, although with a soft fail (~all) for unauthorised servers. This configuration permits only servers operated by or on behalf of the organisation "
+                                          "to send email. However a soft fail should only be used as a transition to a hard fail (-all). The permitted servers were:\n- {}".format(domain, "\n- ".join(allowed_servers)))
                     got_reject = True
                 elif param == "?all":
-                    self.printer.error("The following mail servers are authorised to send mail from the '{}' domain, with a neutral 'all' record for unauthorised servers: \n    {}".format(domain, "\n    ".join(allowed_servers)))
-                    self.__add_commentary("The domain '{}' utilised SPF records, although with a neutral 'all' record (?all) for unauthorised servers. This configuration permits any servers to send email. The neutral 'all' record should be transitioned to a soft fail (~all) or to a hard fail (-all). The permitted servers were:\n- {}".format(domain, "\n- ".join(allowed_servers)))
-                    got_neutral = True
+                    self.printer.error("The following mail servers are authorised to send mail from the '{}' domain, with a neutral 'all' record for unauthorised servers which would allow domain email spoofing to be "
+                                       "performed: \n    {}".format(domain, "\n    ".join(allowed_servers)))
+                    self.__add_commentary("The domain '{0}' utilised SPF records, although with a neutral 'all' record (?all) for unauthorised servers. This configuration permits any servers to send email and as such "
+                                          "it would be possible to spoof emails from the organisation (e.g. user.name@{0}). The neutral 'all' record should be transitioned to a hard fail (-all). The permitted servers "
+                                          "were:\n- {1}".format(domain, "\n- ".join(allowed_servers)))
+                    self.__add_vuln(self.src_vulnerabilities["weak-spf"], {'spf': record})
+                    got_reject = True
 
-            if not got_reject or got_neutral:
+            if not got_reject:
                 self.printer.error("The '{}' domain is configured in a way that would allow domain email spoofing to be performed.".format(domain))
-                self.__add_commentary("The domain '{0}' was not found to have a secure SPF record configured, and as such it would be possible to spoof emails from the organisation (e.g. user.name@{0}). The SPF record was set as:\n- {1}".format(domain, record))
+                self.__add_commentary("The domain '{0}' was not found to have a secure SPF record configured, and as such it would be possible to spoof emails from the organisation (e.g. user.name@{0}). The SPF record "
+                                      "was set as:\n- {1}".format(domain, record))
                 self.__add_vuln(self.src_vulnerabilities["weak-spf"], {'spf':record})
 
             return True
