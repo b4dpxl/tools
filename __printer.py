@@ -2,8 +2,9 @@ import re
 
 
 class Printer:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
+    DEBUG = '\033[90m'
+    PURPLE = '\033[95m'
+    INFO = '\033[94m'
     OKGREEN = '\033[92m'
     WARNING = '\033[93m'
     FAIL = '\033[91m'
@@ -12,27 +13,33 @@ class Printer:
     UNDERLINE = '\033[4m'
 
     __debug_on = False
+    __trace_on = False
     __wrap_length = 0
 
-    def __init__(self, debug=True, wrap=0):
+    def __init__(self, debug=True, trace=False, wrap=0):
         self.__debug_on = debug
+        self.__trace_one = trace
         self.__wrap_length = wrap
 
     def ok(self, str):
-        self.print_col( "[+]", self.__wrap(str), self.OKGREEN)
+        self.print_col("[+]", self.__wrap(str), self.OKGREEN)
 
     def info(self, str):
-        self.print_col( "[*]", self.__wrap(str), self.OKBLUE)
+        self.print_col("[*]", self.__wrap(str), self.INFO)
 
     def warn(self, str):
-        self.print_col( "[~]", self.__wrap(str), self.WARNING)
+        self.print_col("[~]", self.__wrap(str), self.WARNING)
 
     def error(self, str):
-        self.print_col( "[!]", self.__wrap(str), self.FAIL)
+        self.print_col("[!]", self.__wrap(str), self.FAIL)
 
     def debug(self, str):
         if self.__debug_on:
-            self.__default("[-] {}".format(self.__wrap(str)))
+            self.print_col("[-]", self.__wrap(str), self.DEBUG)
+
+    def trce(self, str):
+        if self.__trace_on:
+            self.__default("[ ] {}".format(self.__wrap(str)))
 
     def print_col(self, str1, str2, col):
         print("{}{}{} {}".format(col, str1, self.ENDC, str2))
