@@ -16,11 +16,12 @@ History:
 0.4 - externalised Printer and updated to use ".format" because 'reasons'
 0.5 - Added support for neutral all SPF records (?all)
 0.5.1 - Fixed issues with '?all'reporting. DKIM reports now distinguish between no DKIM and no sample email
+0.5.2 - Updated DKIM record check. "k=" is optional, MS seem to leave it off.
 """
 __author__ = "b4dpxl"
 __credits__ = ["https://protodave.com/", "https://github.com/ins1gn1a/"]
 __license__ = "GPL"
-__version__ = "0.5.1"
+__version__ = "0.5.2"
 
 import argparse
 import dns.resolver
@@ -152,7 +153,7 @@ class EmailAnalyser:
                         # handle long records - TXT records are max 255 chars, split into multiple parts after that
                         if len(str_txt) > 257:
                             str_txt = re.sub(r"\"\s+\"", "", str_txt)
-                        if "k=rsa" in str_txt and "p=" in str_txt:
+                        if "p=" in str_txt:
                             got_dkim = True
                             rsa = re.search("p=([\w\/\+]+)\\b", str_txt).group(1)
                             self.printer.debug("Found RSA key:\n    {}".format(rsa))
