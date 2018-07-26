@@ -18,8 +18,14 @@ import csv
 import codecs
 import os
 import re
-from __printer import Printer
+import sys
 from dateutil import tz, parser
+try:
+    from __printer import Printer
+except:
+    print("ERROR: Please download __printer.py from https://raw.githubusercontent.com/b4dpxl/tools/master/__printer.py")
+    sys.exit(1)
+
 
 
 printer = Printer(debug=False, trace=False)
