@@ -148,7 +148,7 @@ def parse_file(filename, users_array, utf8=False):
                                 users_array.append({"username": state_username, "domain": state_domain, state: pwd})
                             else:
                                 printer.trace("Existing user, SSP or credman")
-                                tmp_user = next(x for x in users_array if x["username"] and x["domain"] == state_domain == state_username)
+                                tmp_user = next(x for x in users_array if x["username"] == state_username and x["domain"] == state_domain)
                                 tmp_user[state] = pwd
 
 
