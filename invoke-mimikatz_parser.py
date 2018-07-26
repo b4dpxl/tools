@@ -7,10 +7,11 @@ pip3 install python-dateutil
 
 History:
 0.1 - First release
+0.2 - Should now extract SSP and credman creds associated to a user
 """
 __author__ = "b4dpxl"
 __license__ = "GPL"
-__version__ = "0.1"
+__version__ = "0.2"
 
 
 import argparse
@@ -32,7 +33,8 @@ printer = Printer(debug=False, trace=False)
 
 users_to_ignore = [
     "(null)",
-    "local service"
+    "local service",
+    "iusr"
 ]
 
 re_user_name = r"^User Name +: +([^\$]+)$"
@@ -44,6 +46,7 @@ re_username = r"\* Username +: +(.*)$"
 
 re_ntlm = r"\* NTLM +: +(.*)$"
 re_password = r"\* Password +: +(.*)$"
+re_domain2 = r"\* Domain +: +(.*)$"
 
 
 def enumerate_dirs(dir, users_array, utf8=False):
@@ -59,6 +62,7 @@ def parse_file(filename, users_array, utf8=False):
     is_newer = False
     in_user = False
     current_user = None
+    current_username = None
     state = None
     current_logon_time = None
 
@@ -73,22 +77,23 @@ def parse_file(filename, users_array, utf8=False):
                 in_user = True
 
             if in_user and re.search(re_user_name, line):
-                un = re.match(re_user_name, line)[1].lower()
-                if un not in users_to_ignore:
-                    printer.debug("Found {}".format(un))
-                    if not any(x["username"] == un for x in users_array):
+                current_username = re.match(re_user_name, line)[1].lower()
+                if current_username not in users_to_ignore:
+                    printer.debug("Found {}".format(current_username))
+                    if not any(x["username"] == current_username for x in users_array):
                         printer.trace("New user")
-                        current_user = {"username": un}
+                        current_user = {"username": current_username}
                         users_array.append(current_user)
                         is_newer = True
                         current_logon_time = None
                     else:
                         printer.trace("Existing user")
-                        current_user = next(x for x in users_array if x["username"] == un)
+                        current_user = next(x for x in users_array if x["username"] == current_username)
                         if "logon_time" in current_user.keys():
                             current_logon_time = parser.parse(current_user["logon_time"])
                 else:
                     current_user = None
+                    current_username = None
                     is_newer = False
 
             if in_user and current_user is not None:
@@ -115,9 +120,12 @@ def parse_file(filename, users_array, utf8=False):
 
                 if re.search(re_username, line):
                     su = re.match(re_username, line)[1].lower()
-                    if su == current_user["username"]:
-                        state_username = su
-                        printer.trace(state_username)
+                    # if su == current_user["username"]:
+                    state_username = su
+                    if "\\" in state_username:
+                        state_username = state_username.split('\\')[1]
+                    state_domain = None
+                    printer.trace(state_username)
 
                 if is_newer:
                     if re.search(re_ntlm, line) and state == "msv" and state_username is not None:
@@ -125,6 +133,24 @@ def parse_file(filename, users_array, utf8=False):
 
                     if re.search(re_password, line) and state == "wdigest" and state_username is not None:
                             current_user["wdigest"] = re.match(re_password, line)[1]
+
+                if state == "ssp" or state == "credman":
+                    if state_username is not None and state_username != current_username:
+                        if re.search(re_domain2, line):
+                            state_domain = re.match(re_domain2, line)[1]
+                            if "\\" in state_domain:
+                                state_domain = state_domain.split('\\')[0]
+
+                        if re.search(re_password, line):
+                            pwd = re.match(re_password, line)[1]
+                            if not any(x["username"] == state_username and x["domain"] == state_domain for x in users_array):
+                                printer.trace("New user, SSP or credman")
+                                users_array.append({"username": state_username, "domain": state_domain, state: pwd})
+                            else:
+                                printer.trace("Existing user, SSP or credman")
+                                tmp_user = next(x for x in users_array if x["username"] and x["domain"] == state_domain == state_username)
+                                tmp_user[state] = pwd
+
 
 
 def main():
@@ -146,7 +172,7 @@ def main():
         print(users)
     else:
         with open(args.output, 'w') as out:
-            writer = csv.DictWriter(out, fieldnames=['username', 'domain', 'logon_time', 'ntlm', 'wdigest'], quoting=csv.QUOTE_ALL)
+            writer = csv.DictWriter(out, fieldnames=['username', 'domain', 'logon_time', 'ntlm', 'wdigest', 'ssp', 'credman'], quoting=csv.QUOTE_ALL)
             writer.writeheader()
             for user in users:
                 writer.writerow(user)
