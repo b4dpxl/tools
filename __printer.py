@@ -18,7 +18,7 @@ class Printer:
 
     def __init__(self, debug=True, trace=False, wrap=0):
         self.__debug_on = debug
-        self.__trace_one = trace
+        self.__trace_on = trace
         self.__wrap_length = wrap
 
     def ok(self, str):
@@ -37,7 +37,7 @@ class Printer:
         if self.__debug_on:
             self.print_col("[-]", self.__wrap(str), self.DEBUG)
 
-    def trce(self, str):
+    def trace(self, str):
         if self.__trace_on:
             self.__default("[ ] {}".format(self.__wrap(str)))
 
