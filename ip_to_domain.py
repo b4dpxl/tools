@@ -31,7 +31,11 @@ from OpenSSL import SSL
 import dns.reversename, dns.resolver
 import os
 import xml.etree.ElementTree as etree
-from __printer import Printer
+try:
+    from __printer import Printer
+except:
+    print("ERROR: Please download __printer.py from https://raw.githubusercontent.com/b4dpxl/tools/master/__printer.py")
+    sys.exit(1)
 
 
 def __get_cert(client, ip, ssl_method):

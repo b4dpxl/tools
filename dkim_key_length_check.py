@@ -26,7 +26,11 @@ from OpenSSL import crypto
 import olefile
 import os
 import sys
-from __printer import printer
+try:
+    from __printer import Printer
+except:
+    print("ERROR: Please download __printer.py from https://raw.githubusercontent.com/b4dpxl/tools/master/__printer.py")
+    sys.exit(1)
 
 
 def extract_headers(file):
