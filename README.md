@@ -16,6 +16,9 @@ Script to find used (and thus unused) IP addresses for a network range from ARP 
 ## ip_to_domain.py
 Uses various methods to try and determine the hostname for a given IP address
 
+## invoke-mimikatz_parser.py ##
+Parse Invoke-Mimikatz.ps1 output files, extracting usernames, hashes, and passwords
+
 ## pass2pie.py
 Takes a password list and generates human readable and CSV output of common passwords, the latter useful for generating charts in Excel
 

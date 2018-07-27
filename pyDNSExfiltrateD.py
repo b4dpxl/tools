@@ -26,7 +26,6 @@ __version__ = "0.2"
 from dnslib import DNSRecord, DNSHeader, A, RR
 import daemon
 from daemon import pidfile
-from __printer import Printer
 import argparse
 import datetime
 import os
@@ -35,7 +34,11 @@ import sys
 import time
 import threading
 import traceback
-
+try:
+    from __printer import Printer
+except:
+    print("ERROR: Please download __printer.py from https://raw.githubusercontent.com/b4dpxl/tools/master/__printer.py")
+    sys.exit(1)
 
 def write(text, file):
     if file is not None:

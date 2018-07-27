@@ -18,7 +18,7 @@ class Printer:
 
     def __init__(self, debug=True, trace=False, wrap=0):
         self.__debug_on = debug
-        self.__trace_on = trace
+        self.__trace_on = trace or trace
         self.__wrap_length = wrap
 
     def ok(self, str):
@@ -70,4 +70,4 @@ class Printer:
                         break
             out.append(tmp)
         # 4 spaces to accomdate "[x] "
-        return("\n    ".join(out))
+        return "\n    ".join(out)

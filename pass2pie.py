@@ -20,13 +20,16 @@ __credits__ = ["https://github.com/ins1gn1a/"]
 __license__ = "GPL"
 __version__ = 0.3
 
-from __printer import Printer
 import argparse
 import operator
 import os
 import re
 import sys
-
+try:
+    from __printer import Printer
+except:
+    print("ERROR: Please download __printer.py from https://raw.githubusercontent.com/b4dpxl/tools/master/__printer.py")
+    sys.exit(1)
 
 def main():
 
