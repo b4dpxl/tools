@@ -18,11 +18,12 @@ History:
 0.5.1 - Fixed issues with '?all'reporting. DKIM reports now distinguish between no DKIM and no sample email
 0.5.2 - Updated DKIM record check. "k=" is optional, MS seem to leave it off.
 0.5.3 - Debranded
+0.5.4 - Allowed override for --domain when specifying --file
 """
 __author__ = "b4dpxl"
 __credits__ = ["https://protodave.com/", "https://github.com/ins1gn1a/"]
 __license__ = "GPL"
-__version__ = "0.5.3"
+__version__ = "0.5.4"
 
 import argparse
 import dns.resolver
@@ -42,8 +43,8 @@ class EmailAnalyser:
     src_vulnerabilities = {
         "no-dmarc": {"id": "1", "text": "No DMARC records were present for the domain '{domain}'"},
         "no-spf": {"id": "2", "text": "No SPF records were present for the domain '{domain}'"},
-        "no-dkim": {"id": "3", "text": "DKIM records were not present on the domain '{domain}'"},
-        "no-dkim-file": {"id": "4", "text": "DKIM records were not present on the domain '{domain}', or no sample email was available to identify the DKIM Selector"},
+        "no-dkim": {"id": "SC-2165", "text": "DKIM records were not present on the domain '{dkim_domain}' which sent the sample email"},
+        "no-dkim-file": {"id": "SC-2165", "text": "DKIM records were not present on the domain '{domain}', or no sample email was available to identify the DKIM Selector"},
         "weak-dmarc": {"id": "5", "text": "The domain '{domain}' was found to have the following issues with the DMARC records:\n- {issues}"},
         "weak-spf": {"id": "6", "text": "The domain '{domain}' was not found to have a secure SPF record configured, and as such it would be possible to spoof emails from the organisation (e.g. user.name@{domain}). The SPF record was set as the following:\n{spf}"},
         "weak-dkim": {"id": "7", "text": "The domain '{domain}' utilised a DKIM key, but the key length of {length} was less than 2048-bits."},
@@ -65,6 +66,8 @@ class EmailAnalyser:
         self.printer = Printer(debug=not quiet, wrap=wrap)
         if file is not None:
             self.selector, self.dkim_domain, self.domain = self.__extract_mail_headers(file)
+            if domain:
+                self.domain = domain # use override domain
             self.has_file = True
         else:
             self.dkim_domain = self.domain = domain
@@ -79,6 +82,7 @@ class EmailAnalyser:
     def __add_vuln(self, vuln, options={}):
         x = options
         x['domain'] = self.domain
+        x['dkim_domain'] = self.dkim_domain
         self.vulns.append({"id": vuln["id"], "text": vuln["text"].format(**x)})
 
     def __extract_sender_domain_from_header(self, header):
@@ -347,22 +351,32 @@ Checks for a valid DKIM record, then validates the length of the RSA key.
 Either a Domain and optional Selector, or a File (Outlook .msg file) must be provided.
 """, formatter_class=argparse.RawTextHelpFormatter)
 
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--domain', '-d', help="Enter the Domain name to verify. E.g. example.com")
-    parser.add_argument('--selector', '-s', help="Enter the Selector to verify [default='default']", required=False, default="default")
-    group.add_argument('--file', '-f', help="Outlook message file (.msg) to analyse")
-    parser.add_argument('--no-dkim', dest="no_dkim", help="Skip DKIM checks", required=False, action="store_true")
-    parser.add_argument('--quiet', '-q', help="Exclude info messages", required=False, action="store_true")
-    parser.add_argument('--wrap', '-w', help="Wrap output at ~80 characters", required=False, action="store_true")
-    parser.add_argument('--ns', dest="name_server", help="Name server to use instead of network default", required=False, default=None)
-    parser.add_argument('--version', '-v', action='version', version='%(prog)s {}'.format(__version__))
+    group = parser.add_argument_group(title="Domain selection", description="""One of --domain or --file must be set. 
+    If --file is used --domain can be set to override the Domain found in the email.
+    The selector is optional, but can be specified with --domain (not with --file) to manually set the DKIM selector.""")
+    group.add_argument('--domain', '-d', help="Enter the Domain name to verify. E.g. example.com", required=False)
+    group.add_argument('--selector', '-s', help="Enter the Selector to verify [default='default']", required=False,
+                       default="default")
+    group.add_argument('--file', '-f', help="Outlook message file (.msg) to analyse", required=False)
+
+    group2 = parser.add_argument_group(title="Other arguments")
+    group2.add_argument('--no-dkim', dest="no_dkim", help="Skip DKIM checks", required=False, action="store_true")
+    group2.add_argument('--quiet', '-q', help="Exclude info messages", required=False, action="store_true")
+    group2.add_argument('--wrap', '-w', help="Wrap output at ~80 characters", required=False, action="store_true")
+    group2.add_argument('--ns', dest="name_server", help="Name server to use instead of network default",
+                        required=False, default=None)
+    group2.add_argument('--version', action='version', version='%(prog)s {}'.format(__version__))
     args = parser.parse_args()
+
+    if not args.file and not args.domain:
+        parser.error("One of --domain or --file is required")
+        sys.exit(1)
 
     wrap_length = 0 if not args.wrap else 80
 
     if args.file:
         #selector, dkim_domain, domain = extract_mail_headers(args.file)
-        analyser = EmailAnalyser(file=args.file, quiet=args.quiet, wrap=wrap_length, ns=args.name_server)
+        analyser = EmailAnalyser(file=args.file, quiet=args.quiet, wrap=wrap_length, ns=args.name_server, domain=args.domain)
     else:
         # selector = args.selector
         # dkim_domain = domain = args.domain
