@@ -21,8 +21,6 @@ __license__ = "GPL"
 __version__ = "0.2"
 
 
-# TODO update to python3 and Printer
-
 from dnslib import DNSRecord, DNSHeader, A, RR
 import daemon
 from daemon import pidfile
@@ -47,7 +45,6 @@ def write(text, file):
 
 
 class UDPRequestHandler(socketserver.BaseRequestHandler):
-
     args = None
     outfile = None
 
@@ -74,7 +71,6 @@ class UDPRequestHandler(socketserver.BaseRequestHandler):
 
 
 class DNSListener:
-
     args = None
 
     def __init__(self, args):
@@ -120,7 +116,6 @@ class DNSListener:
 
 
 def main():
-
     parser = argparse.ArgumentParser(description="""DNS exfiltrator""", formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-f', action='store_true', dest="foreground", help="Run in the foreground, not as a daemon", required=False, default=False)
     parser.add_argument('-o', '--out', dest='out', help="Output file", default=None)
@@ -164,4 +159,3 @@ def main():
 
 
 main()
-
