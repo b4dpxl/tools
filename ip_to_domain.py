@@ -18,11 +18,12 @@ History:
 0.4 - added support for different SSL/TLS versions
 0.5 - externalised the printer module
 0.6 - Updated to ".format", just because I can
+0.7 - Added support for extracting Subject Alternate Names
 
 """
 __author__ = "b4dpxl"
 __license__ = "GPL"
-__version__ = "0.6"
+__version__ = "0.7"
 
 import sys
 import argparse
@@ -56,7 +57,7 @@ def __get_cert(client, ip, ssl_method):
         client_ssl.close()
 
 
-def __get_ssl_subject(ip, port):
+def __get_ssl_domains(ip, port):
     try:
         methods = [SSL.TLSv1_2_METHOD, SSL.TLSv1_1_METHOD, SSL.TLSv1_METHOD, SSL.SSLv3_METHOD]
         cert = None
@@ -71,15 +72,23 @@ def __get_ssl_subject(ip, port):
             client.close()
 
         if cert is not None:
-            return cert.get_subject().CN
+            sans = []
+            for i in range(cert.get_extension_count()):
+                ext = cert.get_extension(i)
+                if 'subjectAltName' in ext.get_short_name().decode():
+                    san = ext.__str__()
+                    if san.startswith("DNS:"):
+                        sans.append(san[4:])
+            return cert.get_subject().CN, sans
         elif errno == -2:
             Printer().error("Unable to establish secure SSL or TLS connection to {}:{}".format(ip, port))
         else:
             Printer().error("Unable to establish secure connection to {}:{}; Error msg: {}".format(ip, port, err))
+            return None, None
 
     except Exception as e:
         Printer().error("Unable to connect to {}:{}; Error msg: {}".format(ip, port, e))
-        return None
+        return None, None
 
     finally:
         client.close()
@@ -100,18 +109,24 @@ def __lookup(host, port, nossl=False, out=None):
     Printer().info("Checking {}:{}".format(host, port))
     proto = None
     if not nossl:
-        CN = __get_ssl_subject(host, port)
-        if CN != None:
-            Printer().ok("Certificate Subject: {}".format(CN))
+        cn, sans = __get_ssl_domains(host, port)
+        if cn is not None:
+            Printer().ok("Certificate Common Name: {}".format(cn))
             # managed to get something from the certificate, must be HTTPS :)
-            proto = "https"
-            if CN.startswith("*."):
+            if cn.startswith("*."):
                 Printer().warn("Wildcard certificate in use")
             elif out is not None:
-                out.write("{}://{}:{}\n".format(proto, CN, port))
+                out.write("{}://{}:{}\n".format("https", cn, port))
+        if sans is not None:
+            for san in sans:
+                Printer().ok("Certificate Subject Alternate Name: {}".format(san))
+                if san.startswith("*."):
+                    Printer().warn("Wildcard certificate in use")
+                elif out is not None and san != cn:
+                    out.write("{}://{}:{}\n".format("https", san, port))
 
-    PTR = __get_reverse_dns(host)
-    if PTR is not None:
+    ptr = __get_reverse_dns(host)
+    if ptr is not None:
         if out is not None:
             if proto is None:
                 # not worked out the protocol from the cert, or not checked the cert. Try and guess from the port
@@ -119,8 +134,8 @@ def __lookup(host, port, nossl=False, out=None):
                 ssl_ports = [443, 8443]
                 if port in ssl_ports:
                     proto = "https"
-            out.write("{}://{}:{}\n".format(proto, PTR[:-1], port))
-        Printer().ok("Reverse DNS: {}".format(PTR[:-1]))
+            out.write("{}://{}:{}\n".format(proto, ptr[:-1], port))
+        Printer().ok("Reverse DNS: {}".format(ptr[:-1]))
 
 
 def __check_file(file):
