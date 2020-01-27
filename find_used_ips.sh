@@ -8,6 +8,8 @@
 # All credit goes to Encription and http://pentestmonkey.net/blog/the-science-of-safely-finding-an-unused-ip-address
 # for showing me how to do this. I just scripted it.
 
+NIC=eth2
+
 # check it's probably an IP (basic regex)
 if ! echo $1 | grep -P "(\d{1,3}\.){3}\d{1,3}" > /dev/null ; then
 	echo "Usage: $0 <target_IP_range>"
@@ -27,7 +29,7 @@ touch $f
 
 for src in 127.0.0.1 0.0.0.0 255.255.255.255 1.0.0.1 ; do
 	echo "Scanning with $src"
-	arp-scan -I eth0 --arpspa $src $1 >> $f
+	arp-scan -I $NIC --arpspa $src $1 >> $f
 done
 
 grep -P "^(\d{1,3}\.){3}\d{1,3}" $f | awk '{print $1}' | sort -V | uniq
