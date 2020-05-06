@@ -1,4 +1,4 @@
-import re
+import textwrap
 
 
 class Printer:
@@ -12,62 +12,55 @@ class Printer:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-    __debug_on = False
-    __trace_on = False
-    __wrap_length = 0
+    _debug_on = False
+    _trace_on = False
+    _wrap_length = 0
 
     def __init__(self, debug=True, trace=False, wrap=0):
-        self.__debug_on = debug
-        self.__trace_on = trace or trace
-        self.__wrap_length = wrap
+        self._debug_on = debug
+        self._trace_on = trace or trace
+        self._wrap_length = wrap
 
-    def ok(self, str):
-        self.print_col("[+]", self.__wrap(str), self.OKGREEN)
+    def ok(self, msg):
+        self.print_col("[+]", self._wrap(msg), self.OKGREEN)
 
-    def info(self, str):
-        self.print_col("[*]", self.__wrap(str), self.INFO)
+    def info(self, msg):
+        self.print_col("[*]", self._wrap(msg), self.INFO)
 
-    def warn(self, str):
-        self.print_col("[~]", self.__wrap(str), self.WARNING)
+    def warn(self, msg):
+        self.print_col("[~]", self._wrap(msg), self.WARNING)
 
-    def error(self, str):
-        self.print_col("[!]", self.__wrap(str), self.FAIL)
+    def error(self, msg, exception: Exception = None):
+        if exception:
+            self.print_col("[!]", self._wrap(f"{msg}\n{getattr(exception, 'message', str(exception))}"), self.FAIL)
+        else:
+            self.print_col("[1]", self._wrap(msg), self.FAIL)
 
-    def debug(self, str):
-        if self.__debug_on:
-            self.print_col("[-]", self.__wrap(str), self.DEBUG)
+    def debug(self, msg):
+        if self._debug_on:
+            self.print_col("[-]", self._wrap(msg), self.DEBUG)
 
-    def trace(self, str):
-        if self.__trace_on:
-            self.__default("[ ] {}".format(self.__wrap(str)))
+    def trace(self, msg):
+        if self._trace_on:
+            self.__default("[ ] {}".format(self._wrap(msg)))
 
     def print_col(self, str1, str2, col):
         print("{}{}{} {}".format(col, str1, self.ENDC, str2))
 
-    def __default(self, str):
-        print(str)
+    @staticmethod
+    def __default(msg):
+        print(msg)
 
-    def __wrap(self, str):
-        if self.__wrap_length == 0:
-            return str
+    def _wrap(self, msg):
         out = []
-        wl = self.__wrap_length - 4 # "4" because of the "[x] "
-        for line in str.split('\n'):
-            tmp = line.strip()
-            while len(tmp) > wl:
-                # Try for a space to split on first so we don't mess up IP addresses and domains
-                r = re.search(r"[\s]", tmp[wl - 1:])
-                if r is not None:
-                    i = r.start() + wl
-                    out.append(tmp[:i].strip())
-                    tmp = tmp[i:].strip()
-                else:
-                    if len(tmp) > wl + 15: # bit of a buffer to try and stop splitting the last word
-                        # just hard split :(
-                        out.append(tmp[:wl].strip())
-                        tmp = tmp[wl:].strip()
-                    else:
-                        break
-            out.append(tmp)
-        # 4 spaces to accomdate "[x] "
-        return "\n    ".join(out)
+        init_indent = ""
+        indent = " "*4
+        for line in msg.splitlines():
+            if self._wrap_length:
+                out.append(textwrap.fill(line, self._wrap_length, initial_indent=init_indent, subsequent_indent=indent))
+            else:
+                out.append(init_indent + line)
+
+            init_indent = indent
+
+        return "\n".join(out)
