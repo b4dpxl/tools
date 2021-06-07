@@ -24,9 +24,8 @@ def main():
     else:
         domain = url.netloc
 
-    domain = get_domain_from_cname(domain)
-
     # check if it's a CNAME first
+    domain = get_domain_from_cname(domain)
 
     try:
         results = resolver.resolve(domain, 'A')
@@ -44,7 +43,7 @@ def get_domain_from_cname(domain, depth=1, max_depth=3):
             if domain.endswith("."):
                 domain = domain[:-1]
                 if depth >= max_depth:
-                    sys.stderr.write(f"Too many recursions, using domain as-is\n")
+                    sys.stderr.write(f"\033[91mToo many recursions, using domain as-is\033[0m\n")
                     return domain
             return get_domain_from_cname(domain)
     except resolver.NoAnswer:
