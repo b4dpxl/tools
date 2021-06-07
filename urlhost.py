@@ -4,6 +4,9 @@
 urlhost.py
 
 Acts as the Linux `host` command, but accepts URLs. Useful for copy/pasting from a browser
+
+Requirements: 
+    dnspython
 """
 
 import argparse
