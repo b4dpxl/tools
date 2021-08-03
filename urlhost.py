@@ -36,6 +36,9 @@ def main():
             print(f"{domain} has address {result.to_text()}")
     except resolver.NoAnswer:
         print(f"Unable to resolve {domain}")
+    except resolver.NXDOMAIN:
+        print(f"Host {domain} not found: 3(NXDOMAIN)")
+
 
 def get_domain_from_cname(domain, depth=1, max_depth=3):
     try:
@@ -49,7 +52,8 @@ def get_domain_from_cname(domain, depth=1, max_depth=3):
                     sys.stderr.write(f"\033[91mToo many recursions, using domain as-is\033[0m\n")
                     return domain
             return get_domain_from_cname(domain)
-    except resolver.NoAnswer:
+    
+    except (resolver.NXDOMAIN, resolver.NoAnswer):
         # not a CNAME
         return domain
 
