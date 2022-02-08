@@ -43,6 +43,9 @@ Check a domain or series of domains for vulnerabilty to [subdomain hijacking](ht
 ## subdomain_hijack_checker_mt.py
 Multi-threaded version of `subdomain_hijack_checker.py`
 
+## swagger_endpoint_extractor.py
+Extract a simple list of endpoints from a Swagger/OpenAPI JSON document
+
 ## tls_server.py
 Start a SSl/TLS listener with your choice of protocol. Useful for testing protocol version support. The protocol versions supported are reliant on the version of OpenSSL available on the host.
 
