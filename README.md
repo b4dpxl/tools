@@ -22,6 +22,9 @@ Parse Invoke-Mimikatz.ps1 output files, extracting usernames, hashes, and passwo
 ## pass2pie.py
 Takes a password list and generates human readable and CSV output of common passwords, the latter useful for generating charts in Excel
 
+## pyDNS.py
+DNS server which redirects requests for specified domains to another IP. Returns the correct response for all other domains
+
 ## pyDNSExfiltrateD.py
 Script to act as a DNS listener, and record the lookups to a log file with timestamp & source nameserver IP. Useful for exfiltrating data via DNS
 
@@ -33,6 +36,21 @@ Updates all A-records for specific CloudFlare DNS zones (domain names) to the cu
 
 ## SimpleDNSServer.py
 Simple DNS server. Responds to any request with the specified IP address
+
+## subdomain_hijack_checker.py
+Check a domain or series of domains for vulnerabilty to [subdomain hijacking](https://book.hacktricks.xyz/pentesting-web/domain-subdomain-takeover)
+
+## subdomain_hijack_checker_mt.py
+Multi-threaded version of `subdomain_hijack_checker.py`
+
+## tls_server.py
+Start a SSl/TLS listener with your choice of protocol. Useful for testing protocol version support. The protocol versions supported are reliant on the version of OpenSSL available on the host.
+
+## urlhost.py
+Works the same as the generic `host` command, but handles URLs. Handy for when copy/pasting from a browser
+
+## username_generator.py
+Generate various permutations of username for a given first and last name.
 
 ## requirements.txt
 Python PIP requirements.txt file. Covers all scripts (unless I've missed any), so may introduce unecessary packages if you only want a specific script
