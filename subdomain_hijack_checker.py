@@ -2,11 +2,16 @@
 
 import argparse
 import fileinput
+import sys
 
 from dns.exception import DNSException
 from dns.resolver import Answer, Resolver
 
-from __printer import Printer
+try:
+    from __printer import Printer
+except:
+    print("ERROR: Please download __printer.py from https://raw.githubusercontent.com/b4dpxl/tools/master/__printer.py")
+    sys.exit(1)
 
 __version__ = "0.0.1"
 
