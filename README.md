@@ -1,5 +1,5 @@
 # tools
-Miscellaneous tools with no better location.
+A bunch of miscellaneous tools with no better location.
 
 ## email_spoof_header_checker.py
 SPF, DMARC, and DKIM record checker. Replaces dkim_key_length_check.py
