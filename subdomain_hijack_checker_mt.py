@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 """
-Enumerates a list of subdomains to see if any are potentially vulnerable to subdomain hijacking
+Enumerates a list of subdomains to see if any are potentially vulnerable to subdomain hijacking.
 """
 
 import argparse
