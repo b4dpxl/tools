@@ -35,7 +35,7 @@ for domain in [x.strip() for x in fileinput.input(files=args.files)]:
                 printer.debug(f"{domain} resolves to {resolver.resolve(target)[0]}")
             except DNSException:
                 printer.warn(f"target {target[:-1]} of CNAME {domain} is dangling!")
-                if ".s3." in target and ".amazonaws.com":
+                if ".s3." in target and ".amazonaws.com" in target:
                     printer.error(f"{target} is an Amazon s3 bucket!!")
 
                 elif ".storage.googleapis.com" in target:

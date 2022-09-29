@@ -86,7 +86,7 @@ def check_domain(domain, name_server=None, thread_id=""):
                 printer.trace(f"{thread_id}{domain} resolves to {resolver.resolve(target)[0]}")
             except DNSException:
                 printer.ok(f"{thread_id}target {target[:-1]} of CNAME {domain} is dangling!")
-                if ".s3." in target and ".amazonaws.com":
+                if ".s3." in target and ".amazonaws.com" in target:
                     printer.error(f"{thread_id}{target} is an Amazon s3 bucket!!")
 
                 elif ".storage.googleapis.com" in target:
